@@ -13,7 +13,8 @@ export default function Home() {
     setLogs(["[Gateway] Sending Ingestion Request...", "[System] Waiting for AI Scoring..."]);
     
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ingest`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://sentinel-gateway-uws6.onrender.com";
+      const res = await fetch(`${apiUrl}/ingest`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -29,7 +30,6 @@ export default function Home() {
 
       const data = await res.json();
       
-      // Note: We check data.is_fraud which comes from your Python service
       const isApproved = !data.is_fraud;
       
       setLogs(prev => [
