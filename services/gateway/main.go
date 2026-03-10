@@ -6,23 +6,29 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os" // Required for os.Getenv
 )
 
 func main() {
-	// Changed route to /ingest to match your React fetch call
+	// Matches the /ingest call from your React frontend
 	http.HandleFunc("/ingest", handleAnalyze)
 
-	fmt.Println("🌐 Gateway (Direct Mode) live on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	// In the cloud, Render provides the PORT variable. Locally, we use 8080.
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	fmt.Printf("🌐 Gateway live on port %s\n", port)
+	log.Fatal(http.ListenAndServe("0.0.0.0:"+port, nil))
 }
 
 func handleAnalyze(w http.ResponseWriter, r *http.Request) {
-	// 1. ADD CORS HEADERS (Fixes "Failed to Fetch")
+	// CORS Headers - Allow your Vercel frontend to talk to this Gateway
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
-	// Handle Preflight request
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -33,25 +39,25 @@ func handleAnalyze(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Read the body from React
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Error reading request", http.StatusInternalServerError)
-		return
+	// 1. Get the AI Service URL from the Environment Variable you set on Render
+	aiServiceURL := os.Getenv("AI_SERVICE_URL")
+	if aiServiceURL == "" {
+		// Fallback for when you are testing on your own computer
+		aiServiceURL = "http://localhost:8000"
 	}
 
-	// 3. Forward to Python AI Service
-	resp, err := http.Post("http://localhost:8000/predict", "application/json", bytes.NewBuffer(body))
+	body, _ := io.ReadAll(r.Body)
+
+	// 2. Forward the request to the dynamic URL
+	fmt.Printf("🔍 Forwarding to: %s/predict\n", aiServiceURL)
+	resp, err := http.Post(aiServiceURL+"/predict", "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		fmt.Println("❌ AI Service (Port 8000) is offline")
+		fmt.Println("❌ Error reaching AI Service:", err)
 		http.Error(w, "AI Service is offline", http.StatusServiceUnavailable)
 		return
 	}
 	defer resp.Body.Close()
 
-	// 4. Return result to React
 	w.Header().Set("Content-Type", "application/json")
 	io.Copy(w, resp.Body)
-
-	fmt.Println("✅ Request successfully processed")
 }
