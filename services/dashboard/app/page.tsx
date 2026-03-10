@@ -13,7 +13,7 @@ export default function Home() {
     setLogs(["[Gateway] Sending Ingestion Request...", "[System] Waiting for AI Scoring..."]);
     
     try {
-      const res = await fetch("http://localhost:8080/ingest", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ingest`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
